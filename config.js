@@ -5,4 +5,4 @@ window.__SCAN_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2nK9N2QzxYrx
 
 /* Stripe Payment Link for the $75/year quarterly-monitoring plan (starts with https://buy.stripe.com/).
    Used by "Upgrade to annual" and "Start free, then upgrade". Empty = those buttons scroll to pricing. */
-window.__CHECKOUT_URL = "";
+window.__CHECKOUT_URL = 'https://buy.stripe.com/test_fZu4gA3yj2YU9kF45z9Zm00';

@@ -1,0 +1,567 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PHP2Shell for Healthcare</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="For healthcare organizations: find patient portals, scheduling, telehealth and public sites exposed to PHP2Shell (CVE-2026-109618, CVE-2026-109619). Free agentless baseline scan with prioritized remediation.">
+<!--
+  SureShield · PHP2Shell landing page · AUDIENCE: Healthcare organizations (2 of 3)
+  Same structure and backend as the MSP page (php2shell-msp.html); different design language (light, clinical).
+  FRONTEND  Tailwind Play CDN for preview. Production: npx tailwindcss -i input.css -o dist/landing.css --minify
+  BACKEND   Posts to API_ENDPOINT (the Apps Script web app). audience = "healthcare".
+            Consent text must match CONSENT_TEXT_EXPECTED in scan-request.php exactly.
+  Logo      SureShield.png from sure-shield.com, embedded as WebP.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        navy: { 950:'#0B1F33', 900:'#11294A', 800:'#173A5E', 600:'#3A5B7D' },
+        mist: { 25:'#FAFCFD', 50:'#F3F7FA', 100:'#E8EFF5', 200:'#D5E0EA', 400:'#8597AB', 500:'#5D7086' },
+        care: { 50:'#EAF3FC', 100:'#D4E7F8', 300:'#93C5EE', 500:'#3B8FD9', 600:'#2273BE', 700:'#1A5C99' },  /* light blue (review 26 Oct) */
+        risk: { 50:'#FDEEEA', 100:'#F9D6CE', 500:'#C8432B', 600:'#A93620' },
+        plum: { 600:'#5E2350' },
+        gold: { 50:'#FEF6E7', 500:'#E39B1B', 700:'#9A6200' }
+      },
+      fontFamily: {
+        display: ['Lexend','system-ui','sans-serif'],
+        sans: ['"Source Sans 3"','system-ui','sans-serif'],
+        mono: ['"IBM Plex Mono"','ui-monospace','Consolas','monospace']
+      }
+    }}
+  }
+</script>
+<style>
+  /* Single committed light, clinical look; colors are explicit so it reads the same on any host background. */
+  :root{ color-scheme:light; }
+  body{ background:#FAFCFD; color:#0B1F33; }
+  .gutter{ padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); }
+  .display{ font-family:Lexend,system-ui,sans-serif; letter-spacing:-.015em; text-wrap:balance; }
+  .field{ width:100%; background:#fff; border:1.5px solid #D5E0EA; border-radius:10px; padding:.72rem .9rem; font-size:1rem; color:#0B1F33; transition:border-color .15s, box-shadow .15s; }
+  .field::placeholder{ color:#8597AB; }
+  .field:hover{ border-color:#B8C7D6; }
+  .field:focus{ outline:none; border-color:#3B8FD9; box-shadow:0 0 0 4px rgba(59,143,217,.16); }
+  .field[aria-invalid="true"]{ border-color:#C8432B; }
+  :focus-visible{ outline:2.5px solid #3B8FD9; outline-offset:3px; }
+  .pulse-line{ stroke-dasharray:600; stroke-dashoffset:600; animation:draw 3.5s ease-out .3s forwards; }
+  @keyframes draw{ to{ stroke-dashoffset:0 } }
+  .blink{ animation:blink 1.8s ease-in-out infinite; } @keyframes blink{ 50%{opacity:.3} }
+  .spin{ animation:spin .8s linear infinite; } @keyframes spin{ to{transform:rotate(360deg)} }
+  @media (prefers-reduced-motion:reduce){ .pulse-line{animation:none;stroke-dashoffset:0} .blink,.spin{animation:none} html{scroll-behavior:auto} }
+  html{ scroll-behavior:smooth; }
+  .modal-back{ position:fixed; inset:0; z-index:50; background:rgba(11,31,51,.45); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center;
+    padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px)); }
+</style>
+
+<div class="font-sans text-[17px] leading-relaxed antialiased">
+
+  <!-- Advisory banner -->
+  <div class="bg-navy-950 text-white">
+    <div class="gutter mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2.5 text-center text-sm">
+      <span class="blink h-2 w-2 rounded-full bg-risk-500" aria-hidden="true"></span>
+      <span class="font-semibold">Security advisory for healthcare:</span>
+      <span class="text-mist-200">PHP2Shell puts hospital websites and patient portals at risk. Free baseline exposure scan, for a limited time.</span>
+      <a href="#scan" class="font-semibold text-care-300 underline underline-offset-4 hover:text-white">Check your systems</a>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <header class="border-b border-mist-100 bg-white">
+    <div class="gutter mx-auto flex max-w-6xl items-center justify-between py-4">
+      <a href="https://sure-shield.com" class="inline-flex items-center" aria-label="SureShield home">
+        <img src="data:image/webp;base64,UklGRgYiAABXRUJQVlA4WAoAAAAgAAAAVwEAZQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggGCAAAHBtAJ0BKlgBZgA+MRaJQqIhIRU65kQgAwSyAGra2/+A7JDRnX/yL/Jj5Xq//Y/7F+gP3l/3/yh7YowHqb7zfoP8V+7n+W+gH+S9Sf3I+4N+nn+y/uX7uf2/uGfup6hv2Q/Zj3Xv+L/vP8l7yP6/6gH9Q/wfrQ/9r2UvQM/l/+R/+/rlftN8H37a/+v/afAt/P/77/7fYA9ADp7+mv9f/FrwA/r/9o/YH+2f+jzKfN/2P8k/3m6A/UnmV/GPrd9f/sP7O/3/9rfvN++/4fwV+R38n6gX47/HP7X+UX9i/cTj0LSf8L1BfVn51/d/75+3H9+/c72ZP4L8tPcv7A/6r3AP5H/MP8l/af2o/t3//+mf9z4Yf2f/d+wF/JP57/kv7j/mv+l/ff/////xd/if9v/hf9D/4f8d7UPzD+7f8X/K/5//0fQL/IP5v/mv7f/jP/F/jP///6PvB9eP7W/+b3JP1i/535/pAoWvOWQeztvDgW2jdzzOM/sLpIFKPekDZ3pA2d6QNmCVwhmkE0/2u9RZTwl6GsmyyCj6cImnah9GELZbnD95iiD1amfR3lVXs6p5XmOdOW6lgcNho8ku0tP2jfJidMj+f3wqfd+ssL9SVjWGWSwWfzQgQSCogVjkOdKGnQAmcOti3b4Eb5x1GyBYu5kzTXoZECsMiPROhaTLwW5uGwJ/bDdYQjF/dEYVT22zWsb0ctGFoF2843PXR7Rf5+iELPwOwdIEQDe9YcERvvKFg7zcVx7/AzmKvufythfVdWASQGw3og3ozHVBjhlfShNdCvJmwQ8sLtkfIyyOxJhoXNr5u+Kbda1XxKZ3tDAneV9+qqpTso90V0qqmNTDNgIa/u73l6Y69OvDT90+XkhXf/ai4LitacaKQZCn0zzVzbG7cQH7I/2pAOAXW74rjZRjMH10wcBngwTpetD+LQ2wMFONuKhGaJMMVnNV+KWWoi9koEeEU3ZFS6FaCtOqC2kQ4hNmfymOzXoYvh2ZM4is6Pv1KJJhZO75IC3Jki9oDWuW6Rg3QN4ZkgF0ZkhD/4o7b3w2sZUP02nWJ4/bmMrYz88vJ6gvBBDldO8tgMOxA1ksWDpMu0aGeRMlhuybibWS8lgjIUFToKzQ/aM1MRa0JfytovhsJmxDivxLVm61CkD4MSCngPTyGgRWG2d6QNkAAP7+3XreGf8DwmsO1EAzi3L0X3RBEkl0LIOyEGHcfqzECh38gif6VS111uVhr3dF9NRq7ci3d9dhFEn6Rfzd39QZtzKFZx6pCfI0BReiAdSDiesaJRvLSrhfejN6X9Xn7yVg4F4hwwYhx58fqcQTaSLFt7baq6l3MJf4iOZjDxzFfJQ/ZVqWYudfO4mxycD19Qqads/rc57B/c9dhJjXzwBEkfdTvSIHpVpAjaWYfg891AJbzU5FNHlK2hZR+Ntaj3pEjAftkeJhAGj7XQHdQRySVBU6cja3PXMMLaN/llA83wnQ+I/ZDFGYq4dopvZ5uvhBK5eMiKcaKZ5EH75bOgIX/cNIuKMM8fYS4fcYOPRPBuHTcJAfxeHE5Wo51PTF4O/2kAAAAzVq5hB+Vujf2lGf58nvrixCd5Y9RXNRfXsRYPVHvQChRxR/tWcD9/SDTx5Jhlduf696ZpNHzvXnD/Mk//hnPuvs6MQpPaP5Xey5Q9Lo1oqwwlF7pmRlO5dRJLzSW4tlqa/Fim1YwR88c66cJLcaNTUoImuEY4lRqJJ71jejh6PTNk/q5HVGciTnv9JgGVjgTzc+48Uu2FBqns3WA1Ks48PiDIUxcIpXgGtsLcYOcF8u5rb9Da5LQ7KC0+QBnurxXw8OP0y7QrsRryzYS+DHqffsDj7Fz8ISHek6Qq4uv6X5M474iy6TSZU6G26xIbDvBXo7N0RWeVcIAkOZa+ETMT6Bbtx5eKr99OY8qVXbHo4/Rcimbw7PL7d2ydi8Mj1Gbq4Q/ipppoChqfAiAb0oXw2lMLbIPu8n59OkEnhrQb+OgmPSQ/MeB/npeehLL9FYxDY0zWCukKgBGg9tku5ECZUPEjY1rdspzh+0BoZDgjTL78f2NbR43Fj4BXo7a//gzTiKvSVoOowcw8AFIzwomRo0jzZkCq3gQQLh4Ex5EiwR3xIJNge9dL+NB/ijvK0bJrNuKxg7KO6/iPm2cj8z6vzpEjYVIs8Y9yZAIj7KY9z9vQ2hPWWYMYO8naJs6UI3lQwBcUXFqe7htOWn+73suMXAGsc3cRwlb7bJkXCkiG9ygp5NGihKf8z6WX16AwXYCrl6uYRSnWP9GO8t5r3gHj5erXGL5+vNvdPidEYByUGBUfKXiuPA0VK9u+MfVIblu5kLg6Mo8xJmFjJpMR8CgoGrdsjv/BmRzRlf2r8Cxj2hgvJzxzOKkzYa7hMEQbzJ0s4VSZBvLAhLfA/irfrAPyJqegjsxwjuecLdcCmQYRgl/FkKiOnXO5YWVY5jcrSU5du6B789zC8yy6jBWeyd0kx0LGSCoCuvh6GNVzGvOOeP814TFEE2LoJV/5h4yRYc4fSD4hsAIeN77ULXVMTnzX1dtafNaSKiz1YgPH3Z1mDHRcOwiud8gC0FOxe5+etVby4Mt7pK/PleVc62BrCZd1K8Ejqk1bCp0fqJk9R/luU/q7NgPBITMpQRH4kzEcOctupVCOCfftW5WnTZ9RcGlEXOpDCvXPkmzjPc3hRYv9gqRQbX+WhDriCzu65TIIKPBYOLsAWXHsMCmdb2k38slXa19Ex1QyFCyomZEZKbcodnFp6ibi1SlHJVCddnHueQWImH/ks0YcThQfWbMIipOvS6AqC667cUfA0r8z0w1bFP0iEgFqONMtDuFQHK5lnbOaVxYMwFqd8GdQpEhkzD1CJrh5UP6CyO4vdjm8QSR47X01JvBus3NSQ+LECklybmSWBmMVKPdjdHunpbbB1ct2gtB4Nv16Zppr0AHgP1FoywYA4Si6Yj1BbU3DGs1GnOff1kFrXvi+6UA5lkd90A2a0md8adq4bx7ol/2e+XFnVJn2V2hOrSmu5DYSz8VjAm9MLLu8t8bROTcgoDRCqZvhFOyBEauekt7FAwYwPjOC0nc5SbPCXpuGTy/n0AFOlbF2gz39Mq8QKPAo82oy3DAaW3D3yxRDG0KznWlJf4qLeQTXFDDTCThpBtwHPfvagpoZLgsTYspAwKDP6kTznZ+uNDpMMAKH/7KAzWTYGvYCSfDHMPNcWzXZ9aoG7R+5PasnCqaBUT913KAAzMIVZXUhtxNdwllvSo5WqRl72dxqmiADVwtIw3QIAiz5awioZ5ZXfH1JmabQt3jOFgCJ0n5VEnAiwnC+HF5pLRt3eLjhqsvEgwwoDYkA93mfLODfdLYpcujbQp30EP//oTQPbnTIfpz2O3fUpeD0NAt7N+cHwXIfFHZLsaEUdPVVtsdp9SpKRFhx4vXdXJvMUSPLyt91pHxToIvy0k+e+cr2nzvBL+m7LfmbtPCPgFSg68CALsHJtYdZx78FOIDyXFjkPTlRgKFAHDqyFNXVZLX/LHzqUfXnstCN50L2douBEJtC18aioJekUi3AQ3XweceVP1+Nsn32NzVCEe0ufvuas1ZX4Du3QHVCCUt8sW80ReMAa5oK+1NEUxj6MBvj21s+fg3+V3k71ZiQZ5EgVDMWXvU/zWKC/tJ/126hZcg/Gf1UBR5+vx6MvF/+aaFQQMInFZlNN3M9SztxgN1bMST3O9pPGBPO4mWhmOMxgfOYOK6Jh1ZVk3TclWuSymZqBQC+6b1DFSj4xaLjHEDbhDLCTypNVzN9Ljqo4urb5Z7NdLqt4zp1KiyG/UHZAwLN9kPLubrOSmAyM4puOuSUQaMtQFYiFfcxyMz+EzNsR99oYD99c1cN6Zr9Z4453Yi+AFhliWR80dqw1s/bOp+HzKV/hPtsig+lP6guMXLOwlNglIQ5xrkEw8S42kI55BO0VZZo08fuupsxCKr6pi3iSlNZqWuGOXwMLTFcdMOSV/phMv9reYozSLY2sD8AvOYlqXqc4Jva6yje0fLd/Hc62Nzl7bPNzu8wR1tPcyUaj2EXX8f/3OuLrN8dT4nEOytiaKLe9qvlQ8cHcPz5QWPe2U6kZQCw8zTPuVJ/VP/41qnadHWcxgC0+5uloL8yBzdp80lkTc3Q8lKtI3R+Op2DCgEN1xgVtdjZr4KGVelE+tRPKBXl7a8b7cCYSWGF55BneaYSkyOp7AH5VfT1T0cdUV8eXZMLyCFI4XykJ8X+/rfvsWzuqofrcKri8JponFPCUVxJ7wjwaRqiTxTMcFcInlp1SSso9inLH11fxn9DCoZv3DfUIjlztapyQs7sJ9CXty091lKBqm8LKV4UnGDpcscfo5Sm9MJ+BFXv6DpRiipfJfife9KInT2/05GSwujsPEE5Df/y3wAtoiXs2Dm/XVqLVNAE3ZqcVauYjV8eUuU2QfqyfMRIxXm8BDSRRLrVWChzNpnC4aMraFUDeFl9LWSoBS34hR763rfyDtHA4HMMXgARkhXVuxYtox74KGFJDxv0isws+lPI52pDXBecTg1Eozl7iU+1MesnvRSgpYSKplE2C080xzq3A0m+d4uGU/1YDVc0qvyz4tN8XX6j+SAD259kypB1lhGeUpKBhu5mY3j7U/b0g0clYNbZDBuDepmB9XFkB34LsdXB75g/Yj79YmkxSm/Ti9i6Ztj9pTFijp6YDxvt9L2vlzyUGLz+qZTAwM1JXdoTbGxriOp5NyMYM7S5TXdurtuaoJnspr3I1l4q05T4dXzd41WnsdJKcBSiu8MMJvegbJnH9+RUlU45n39nOUPZ/kuqaDIVgvS6ENYp4Z0DKL1/JXAjJlwvc/otB+nPgp+PUMNFiyZDi0o9BQUHSIm3MYW9Q2Ak20+LFK6ERd03JsMu8Yzw85P/MKKJfXjoU5zyNvmYPxs0KlQYtS/TyyB0AAFfGa2dw5msagIhw2A03/YbzcpGqiMxyTqfGVJ2/Zf8Gmfvp+qb3txC5d1Zu0ZrYdc2P6zb9oq/58BRSchx5tJ3FDEfI3MEe6ShqHfsmEgr5YbhESp4fQXZloRLVSLq4Oi92+NIux8e3P/5DiF9Iv3TMns2FDf0lBA26WGgi2Yf5E6Ja9wNQT6NqhXfHRZAag4Vt6OdTtuS6gqNr51kZd1jBJPBo3fv9q3uf9dwoozstgbJarS8QQ03F50DlUeRfE1YwhalRbg0OKV7wSZgVo/NY7wq0LZ60uO5EpXoG9iskvDw9/hcFukZqgwAB6bplXt0fcMSTWFg0bqCVBwccQk+iDD+5GRn59JbBGm7EZ3Q+rWgqtDjENnzDpFPPVP8QLzs0i6a1SmZd/zhbZ5ZkurRnc1Xz1saCRY2wOvsn2Y95dT11qSHIFKVbk1aICRE8w/2L+7lqOn5HlW4+cLoDg9zVXSCIi/fnXs5MrDfpwg4gxqWELiipBtbo1sp7VTLQcTcAHzFOEWk4K2aAc1fxBC14e9YqHySpns5xrXFXtnhNS9KlJffMQzYg3OYWGnu2q/3TzOznPhfrDr6rwCS9CHxsMzKxSxlZL34xH/TF93kRWjpNjJuUhuKqGc1xwKbHnwcNQSngDbGCFMy9Giq3SvWz6PsaqhjlcvWcHMxqiLTszYEJzqIsJb5Eed6WUl3vF8zwrkmStSMMS/vbIbzjv/IoYSmlydBcxgFjNSPZcAPbmZF+As7VzaPwIkk+8Zgs6IWC4Wz/ICXMZfIf61XIZmSZ6cN45thM7Z4YwgxmN7LAfziwEEILz9YkZ7/hrK0kT+9+YLTZhr1y9prfQu10xLpjO2Vyi/8zNR5xPV3i1FDikBOo6wXcDbvpGyKF0+BSAgD+QLo0wb7GY4pJSnaqGjKzLv2i8pEHs5OPbEf0+S+m5D7UQ8ZGgXFF65DQFWk93IA0ihkcXgmADYM4+nzKzf02m4ddfYGiZGvlw0N+s55dQQk1eToffMQjjxhuRAgjjDmF2elpwkhQtG3GplI5BMdkRD99UEzbkbwBEdWH4AiUj6IFuCEpNC4wQ3S244oB7BZQaTFLWWWQSvlUBsIuvYqzs2hJzoXo5IQ9qQa5u+0M/1jznx5xQ4zv8l+vpzUmQXkxDgnYLNTebyeB6CdtPQSlid7cUAcWx9p3i3sjeiObTubrLGjbOop+MtEIfTGIWY8aregWLAdTk1WXACq1ja25WN/bX4m5cbFzKZpVnmJCgp8z7vsZEtoP48N/VEfO6Ne3L9/1e+FIow0+3+OUQluoIsCZdOlL/iKt4savLu4uOSqVgoXbgUdhtuDZN//4Y8O1emRQyNrNUakUPjeeAV38N1qvodRsxj9BYEqFTAotS6wbcakmvVffxr2LDeH4XZgaFozrV5mOwb7fe9oRVs/I4PNNiUV8UL/8ZXd2exx8R4rdssq9aluj6awVoCaSmZdp8j0dq47ZlIWLHvr55jS16zQp1qwUhEUl8A4bhEMWYCl4JcLKQcK96iC/PfMwmX3+dg94zAU6ikTo3nt354EisbLuUtqrBzYatDtJEbj4SONRldDvB2if8xvjt+KGK3kSRd5A1J2yHxfIJECQeVdnyvBh/hUmT3mvl8RKfwvio7Lm2cHoQivVTiRS5QsEJr7b8P+ztpzV1H0nAdz/Fsv9oEZYLnn3e7jP9JPXjJ9RvsjszL83gHEsAjePygGhN/Nvsr2McGYAM+V0OlWtro8N83zmlla9RkS7l3di/xo/BEPjWyIMc0trhA069oIsjhYc+kT2nooV1z3lgfFlWIN5Op+uiwATmdYU3GNnVRs7a+mcDzfznxp3LvUZBRdyHn1NfQgRT9wpagxw0OIsG9US4Dwcd/Ugvxub1Q7JrBoLZBe6/HfBuHyk/yc8G7RRneRoTspzAStS/49zu7zNO/2pIbAYqUGBZsaM4oibS2SN/paU5pkCM/8QpknlSa5tf7jp4hdpF5ULcP5ntcOylTOTh2RrgCYvMR+p2zWm5rhwOBbgOuZsmMUxewMMjQTactnyLx9wrWNhJAsQ1mq4OR/EVDf89wIXlic/FLlj4PXK7Th667zCCmk0Qoosqw+U9Y/X0m0jvQAsLud4lnOJmEnSNrhshZOtc0vXOgQF/GpSTEMSmeqsHDs+8m+jejcE68UEBcZFCZvgNTmfLKrYiBhH882WmZma6zxq2wTtK345Qp1+27pHCiAnAVXtxa9ZtzK3bcP+SkWAgdzbe/bSFdX8UZbFjbwq2yY+q1BAIXC7lZwFygweCEPqPi899mohKEJlBzbzhHYPuw+HHgNR0yVlTF67WTyXMEgcgLHMoVWLhAl2cw3GICsWUIcKYzkYJyFjYDtgeYFfZwYa30Q5yPF0hmoVCgy7zkMBjIQ2H+JhoaU4r7IVrsmDv4skPF1VmTFmOkanHKMW56Gkt8pHU0U4pWBzLT6PxaDYQOq4c4w0OdQkX37Utu8VaRlKWBoWxW6m0/7YHHaxLny1xtRnbK+7BPTf9tpCVzpcRREHZB8U0hFLFzIn6Bms/SsWFKqk2eN0fRf4VYYhjwPS9JmOO+b5XmWjmWUwT4Xs3JFSYBTSDG4ScnwP48wg2/ZCcqF37w3OKZiOe6C66ZKj/npoElGjz3v61OOl7ZtvYhMgnu46PjYGFQZ+ue7AMe1N9vqF0DzEKW9uitHlFyLYmTl89MgZCl3y5nRJTssxGpMfuLWAM6ASk6imqMeWozW8BCfZV1YtCpJz1KALJdPtErsCxdT36Q2aX+ZsVfFARziqf/bpzXH4X/yCQwMtu3Ym95tQEi0udoGqAwD5kL1HoX1lg1UFakiJvU53rUfo4YC4P57DPABY5rwkf6nTgzvm8Xb6bX1K0rk0pPVcdBoIkWWQpYDlqY2NgwRCWmCoqQJkUmo0JzeRcd3r/PO853/yriIpDFTWgrTH7trgF7LcbYYBYyuNHmnQORZdesyCdm2TDDb9Vuw8RIZfYeVJ6MNfnJlNmmpRysgIKEhmO02UbiQj1xg7K4gqBt1LygFQTtXmxVcXYEzt4M9VLXDx4Rb0MEbJ2sxVpfLEYw9UoikLcuVuFroVR63mIu4aaf6sIgcvCmJigwGEDQc5YgFfLRUbL63+Q53CaTx2fgB/+YLvQIs89w0DMt4Fz1f4x2fZ1yZUn76supxO/b4G0eVtr8EYaFk4cC2svcN0W6A/cG/7XVd6BdUQ9zppwWVdcK/EB41q/owWyD4vl8R//JNIF1Py0A5vCLpyxknak1PL9+8vkdDFQ+1D18rmW5z7tfEH0kZ7oLLBGDOBB/EKp8B9z0/aXtID1Ud6FZ6V6pv5QbpVlJpnDAtiHkf7cej5mJ37AgLLmsUsoKi9Tp0J+a6KXQc6YRz6DNAXaOItFJu/DslH/W6fdIxVRSyaW1zc8BO24IBu/Ud8Nj3SC62TNEX5mAsdvFzd6xa8Qup45gcpslt3wZae5uyrcFN1GbGZoqVBFemEWb9cJVX0QCM5Ky+T3DKxtyYPYjPJPjJsCxw+Qw1YmQRkiyBxLkH5NbBXbfrAUBU1Gjw7J+8xJdb+91Tu0EQkZuESeNwBucTAdYwjbHTs8EsL31nV1J4o/EkrE5keUuk5rrN70IXlP2SjdNV7K53TCeOx2NatdIXp9202EN713n5aMQ3fFYcTbtxC0Hl4TXs3CtjJZJ8aOj9T/mZQhQ+rucIuAtoJrbUOTNuLooeN2L8aKbLuZuQsZZ2GL68KN4WFqrRjfbAnpiO+Vlj60SwnrN96871ws2oSD10jVXBnNp2PEKP8PHMeCK+1pfcrU2guJB0UJgaX3YNH3LH4f7ZkdCI/PMms96kgKRcIJTp5gQCJVrbpmTARh4hBMFuLCwrhRUTpD3LlrXPfbnXdF/rbpX0gcbX3EuVTVdzivjZWMG7+myGwdXkr2x1I4yXMAu9SxaFz8GD5pZi5gX1aQgLRq3CFEfFZql5cijtN02TYxzvIyDDpxxP9YRb3Kx2JHklOIkMpIuM8D5+P1qVDQC28rAIYt5exnvknKx0pDk6UbQx2USzGzgnO+z3EARDy4Vyq8uKFSl5CYTd3Cz4/FljXvzFpaFcV5H5rBQ3qy9hetACQbnd6ZpyuUrs+XdAEyyj4zo/YWuLftig4bDIu3L0uTIaX8Ibe5+OTXKFGGU1+2pTOCVTFwOsjIkuOV3X9v9t6HBqULPZElYIDxDj8lpIpJs1N5t1hzDZWyq/MQ5qtGPjAc+UJM4C3sS8Ij+zt1vHKgDzyblp3WoeZgP7SnDxoctv78N+p49idpuA+Z05iwPlna/bx6WbS++CHaaoaboqu1zvgyuGBykxcsyxZfurfocgVmA2u8OmrojEDF2Diq54mZSjjLAudfyIIJ/SzVmrr0i2nKbcWfaS5NWndSFDln721i4ZrxJoPBnPhRWjLXbI8Llh+UMwWfe8SAFKPV2YSsaS3g5WjhX01AfBMp1I4cRCbzlijkGQ+5T7k8FgtIQWh5A2MqUzO1+ymox/p3ReLqIhdlwbYs+BhybkU4uP9scvn7OSylYNBfUHKFDzgxE+zxuiMdchUBGXDMCFQC8iqo3cnELEMudG29lH9T+lvAu+xj4xnIu/sTCbk7ZkON+6YdhgKBRUUQOwffcrg/b6zqd1xX6Ief8lWrz89wEmoRNL6y7oVMSYZvZ3ITl3gvsjcoGrDu/w5f7LocXVOIgAeB/PLp9DjyfZXcyubQj+p51w/d68osrqmW6ETWKloXg0+c9Cd+zvzfKsNQmDGEY2kXPQOqA3EYQ+PeoN74t0cii8o8kmBWAEo6pW//zVcAl6AXzBJoiEaLFf+M+rTX8IAoQT4eB15pJajbIGudJzGf5CqUA6/M6AVoknwp3gnwKXdi2XVD6ggrgonxeaKMQeNy200ub02bR7HWYtkgWXJP/8tCs5simX3aqCKT3OgJx4LpTUQiK9DfhyMZkZ12jVbWbBbaaXzpoPnz04unXJ3bteVdhGeuksOPReKqYFIZ/3s0ejnzb7vsIQdkGJNTX1kSq4loqwR77Ci/zEiv5BUvSFhwMQqJyQGu7xH/dh5aR+IugnbYorx0Wf9j9ywZOgVFkJHmVKdNcUW44p5av9h3OD6CpRxsAL3aCpsdgipxyA0+5T+U/7xwVNkI+NSzHIxxca503J0cVqR2F9f92+rELSLdMvHybbhxfTYprKSSf1OWQZOxL6u+xRXoAm+6VeYQfGwBj3bRZSk/seiiPJp7o/8bD6VL5djL9LD4ofGJZLtc74Gs7g4Ug16aYIx17dcKq31GVuV5HcC68paZbTSXMJ32ZvcEUfDhQxkgl/UzsUORuBaYu/0P4HceRgpFMfbclQTpvP/WoZNcEkF6VRMlx8Z+cTkL1IYz+rBWJFXUBXbU+imnaZmdtfEzMkjcFxUFy72UwmOZ58YYMB4uN+2VE5ovAgL3YvBEAvSD07+mFGzeMEZsYigZ6Wb2WApQ6kxhlLzGNpEXjpEXbDZn4DA+a0qPDBl03WhMek0wCKoAzmjefs0yMklCPWvMZW3qbIQzFjvSj1P0JPPuTzdcVqHrIwkPRiu9l4rql/n71FVg7Tfd77lmN/4N+tHAmiWwF3mlmVp+rhiLHvOsxYFEpcZs3CniPbpV2O8IGtbWIQO4BJzmjpPfI4iHj3WUg5VNdj8KSdzb9T8F3zN0SMxc+lgK9HBgRXwBw5UDAPQXzRkf6EEV4vJfLXS+22kE6SK0IL6urrgowpSDZ8IeSkqsqWXfw9COSURUed8JE62RK8lNsjpl5AGLFHpAXSpFq2qCufZG2P8SsYf5dMPBEIIstODAija11OLe6M4eN5sBGAnCOhAZmCC4DjZZJd9Y+9ujaRGv88UDx5c+HD/6aSp6YcR5L/O69Xq9Q64w3WsKtQeNi0fnY+Rydyw/06NgzQ7m6ugecTVh3xmHJz4oSgQ4FyNLiu1+vD/041pxMtBS/I63/0lUJ0zFPZSCNVPOSfIc1TGFSNJqAAAAAAB8gAAA" alt="SureShield: Security, Compliance, Integrity" width="344" height="102" class="h-10 w-auto sm:h-11">
+      </a>
+      <nav class="flex items-center gap-6 text-[15px]">
+        <a href="#systems" class="hidden text-mist-500 hover:text-navy-950 md:inline">Systems at risk</a>
+        <a href="#report" class="hidden text-mist-500 hover:text-navy-950 md:inline">Your report</a>
+        <a href="#pricing" class="hidden text-mist-500 hover:text-navy-950 sm:inline">Pricing</a>
+        <a href="#scan" class="rounded-full bg-care-600 px-5 py-2.5 font-semibold text-white hover:bg-care-700">Free scan</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ HERO + FORM ============ -->
+  <main id="top" class="relative overflow-clip bg-gradient-to-b from-care-50 via-mist-25 to-mist-25">
+    <svg class="pointer-events-none absolute left-0 right-0 top-24 h-24 w-full opacity-60" viewBox="0 0 1200 100" preserveAspectRatio="none" aria-hidden="true">
+      <path class="pulse-line" d="M0 60 H420 L440 60 L455 30 L470 85 L488 12 L505 72 L520 60 H1200" fill="none" stroke="#93C5EE" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    </svg>
+
+    <section class="gutter relative mx-auto grid max-w-6xl items-start gap-12 pb-20 pt-10 lg:grid-cols-[1.1fr_.9fr] lg:gap-16 lg:pb-24 lg:pt-14">
+      <div class="min-w-0">
+        <p class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[13px] font-semibold text-care-700 ring-1 ring-care-100">
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8 3h4v5h5v4h-5v5H8v-5H3V8h5z"/></svg>
+          For hospitals, clinics &amp; health systems
+        </p>
+
+        <div class="mt-5 flex flex-wrap gap-2 font-mono text-xs">
+          <span class="rounded-md bg-risk-50 px-2 py-1 font-semibold text-risk-600 ring-1 ring-risk-100">CVE-2026-109618</span>
+          <span class="rounded-md bg-risk-50 px-2 py-1 font-semibold text-risk-600 ring-1 ring-risk-100">CVE-2026-109619</span>
+          <span class="rounded-md bg-white px-2 py-1 text-mist-500 ring-1 ring-mist-200">CVSS 9.2 · Critical</span>
+        </div>
+
+        <h1 class="display mt-5 text-[2.4rem] font-semibold leading-[1.08] text-navy-950 sm:text-[3.4rem]">
+          Your hospital website and patient portal may be running the PHP version attackers are targeting.
+        </h1>
+        <p class="mt-6 max-w-[58ch] text-lg text-navy-800">
+          PHP2Shell is a critical, unauthenticated remote code execution flaw in the PHP core. It lets attackers run code on any internet-facing system serving PHP requests, before application-level protections even activate.
+        </p>
+        <p class="mt-4 max-w-[58ch] text-lg text-mist-500">
+          Because the flaw is in the PHP runtime itself, fully updated applications stay exposed until PHP is patched to 8.2.35, 8.3.36, 8.4.27 or 8.5.12, or an equivalent vendor backport. Exploitation attempts were reported before the official patches were released.
+        </p>
+
+        <!-- Problem vs. fix -->
+        <div class="mt-8 max-w-xl overflow-hidden rounded-2xl bg-white shadow-[0_12px_40px_-18px_rgba(11,31,51,.25)] ring-1 ring-mist-200">
+          <div class="grid sm:grid-cols-2">
+            <div class="min-w-0 p-5">
+              <p class="text-[12px] font-semibold uppercase tracking-[.12em] text-mist-400">A typical scan says</p>
+              <p class="mt-3 font-mono text-[13px] leading-6 text-mist-500">portal.riversidehealth.org<br>PHP 8.3.12 · <span class="font-semibold text-risk-500">vulnerable</span></p>
+              <p class="mt-3 text-[15px] italic text-mist-400">…and leaves the rest to you.</p>
+            </div>
+            <div class="min-w-0 border-t border-care-100 bg-care-50 p-5 sm:border-l sm:border-t-0">
+              <p class="text-[12px] font-semibold uppercase tracking-[.12em] text-care-700">SureShield tells you</p>
+              <ol class="mt-3 grid gap-1.5 font-mono text-[13px] leading-5 text-navy-900">
+                <li><span class="rounded bg-risk-500 px-1.5 text-[11px] font-semibold text-white">P1</span> Patient portal</li>
+                <li><span class="text-care-600">✓</span> Upgrade PHP to 8.3.36</li>
+                <li><span class="text-care-600">✓</span> Restart Apache workers</li>
+                <li><span class="text-care-600">✓</span> Confirm running version</li>
+              </ol>
+            </div>
+          </div>
+          <div class="border-t border-mist-100 px-5 py-4">
+            <p class="display text-xl font-semibold leading-snug text-navy-950 sm:text-[1.4rem]">Not just the risk. <span class="text-care-600">The fix, in priority order.</span></p>
+            <p class="mt-1.5 text-[15px] text-mist-500">Every finding comes with clear remediation guidance, helping you reduce risk to patient data and maintain your compliance posture.</p>
+          </div>
+        </div>
+
+        <!-- Offer -->
+        <div class="mt-6 flex max-w-xl flex-wrap items-center justify-between gap-4 rounded-2xl bg-navy-950 px-6 py-5 text-white">
+          <div>
+            <p class="text-[12px] font-semibold uppercase tracking-[.14em] text-care-300">Limited-time offer</p>
+            <p class="display mt-1 text-2xl font-semibold">Free baseline exposure scan</p>
+            <p class="mt-1 text-[15px] text-mist-200">Then quarterly monitoring for <s class="text-mist-400">$100</s> <b class="text-white">$75/year</b></p>
+          </div>
+          <a href="#pricing" class="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/20 hover:bg-white/20">Compare plans</a>
+        </div>
+
+        <ul class="mt-8 grid max-w-xl gap-x-6 gap-y-4 text-[15px] sm:grid-cols-3">
+          <li class="flex gap-3"><span class="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-care-100 text-care-700"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 10 3.5 3.5L15 7"/></svg></span><span><b class="text-navy-950">Agentless</b><br><span class="text-mist-500">Nothing installed on clinical systems</span></span></li>
+          <li class="flex gap-3"><span class="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-care-100 text-care-700"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 10 3.5 3.5L15 7"/></svg></span><span><b class="text-navy-950">Non-intrusive</b><br><span class="text-mist-500">No exploits, no logins, no PHI accessed</span></span></li>
+          <li class="flex gap-3"><span class="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-care-100 text-care-700"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 10 3.5 3.5L15 7"/></svg></span><span><b class="text-navy-950">Seconds to start</b><br><span class="text-mist-500">No disruption to care operations</span></span></li>
+        </ul>
+      </div>
+
+      <!-- ===== FORM ===== -->
+      <div id="scan" class="min-w-0 scroll-mt-6 lg:sticky lg:top-6">
+        <form id="lead" novalidate class="rounded-3xl bg-white p-6 shadow-[0_30px_70px_-30px_rgba(11,31,51,.35)] ring-1 ring-mist-200 sm:p-8">
+          <div id="formBody">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-[12px] font-semibold uppercase tracking-[.12em] text-care-700">Free baseline scan</p>
+              <span class="rounded-full bg-gold-50 px-2.5 py-0.5 text-[12px] font-semibold text-gold-700">Limited time</span>
+            </div>
+            <h2 class="display mt-2 text-[1.75rem] font-semibold leading-tight text-navy-950">Check your organization's PHP2Shell exposure</h2>
+            <p class="mt-2 text-[15px] text-mist-500">We scan the internet-facing systems connected to the domain in your business email.</p>
+
+            <input type="hidden" id="plan" name="plan_interest" value="free_baseline">
+            <input type="hidden" id="audience" name="audience" value="healthcare">
+            <div class="absolute -left-[9999px]" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+
+            <div class="mt-6 grid gap-4">
+              <div>
+                <label for="org" class="mb-1.5 block text-sm font-semibold text-navy-900">Organization name</label>
+                <input id="org" name="organization" type="text" autocomplete="organization" placeholder="Riverside Community Hospital" class="field" required>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="min-w-0">
+                  <label for="fname" class="mb-1.5 block text-sm font-semibold text-navy-900">First name</label>
+                  <input id="fname" name="first_name" type="text" autocomplete="given-name" class="field" required>
+                </div>
+                <div class="min-w-0">
+                  <label for="lname" class="mb-1.5 block text-sm font-semibold text-navy-900">Last name</label>
+                  <input id="lname" name="last_name" type="text" autocomplete="family-name" class="field" required>
+                </div>
+              </div>
+              <div>
+                <label for="email" class="mb-1.5 block text-sm font-semibold text-navy-900">Business email</label>
+                <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourhospital.org" class="field" required aria-describedby="emailHint emailErr">
+                <p id="emailHint" class="mt-1 text-xs text-mist-500">Scan target: <span id="targetDomain" class="font-mono text-navy-800">your email's domain</span></p>
+                <p id="emailErr" class="mt-1 text-sm text-risk-600" aria-live="polite"></p>
+              </div>
+
+              <div class="rounded-xl bg-mist-50 p-4 ring-1 ring-mist-200">
+                <label for="consent" class="flex cursor-pointer gap-3 text-[14px] leading-snug text-navy-800">
+                  <input id="consent" name="consent" type="checkbox" class="mt-0.5 h-5 w-5 flex-none accent-[#2273BE]" required>
+                  <span id="consentText">I confirm I am an authorized representative and consent to an external attack surface scan of our network by Sureshield.</span>
+                </label>
+                <p class="mt-2 pl-8 text-[13px]"><a href="#scan-terms" id="termsLink" class="font-semibold text-care-700 underline underline-offset-4 hover:text-care-600">Read the scan terms</a></p>
+              </div>
+              <p id="consentErr" class="-mt-2 text-sm text-risk-600" aria-live="polite"></p>
+
+              <button id="submitBtn" type="submit" class="display mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-care-600 px-5 py-4 text-lg font-semibold text-white shadow-[0_10px_24px_-10px_rgba(34,115,190,.6)] transition hover:bg-care-700 active:translate-y-px disabled:cursor-wait disabled:opacity-70">
+                <svg id="btnIcon" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9.5 4.5-1 8-4.5 8-9.5V6l-8-3Z"/></svg>
+                <span id="btnLabel">Claim Free Baseline Scan</span>
+              </button>
+              <p class="text-center text-xs text-mist-500">No credit card · No software · Report delivered to your Reports Hub</p>
+            </div>
+          </div>
+
+          <!-- Success + upsell -->
+          <div id="formDone" hidden>
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-care-100 text-care-700">
+              <svg class="h-6 w-6" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 10 3.5 3.5L15 7"/></svg>
+            </div>
+            <h2 class="display mt-4 text-[1.75rem] font-semibold text-navy-950">Your baseline scan has started</h2>
+            <p class="mt-3 text-navy-800">We're mapping the internet-facing systems of <b id="doneDomain" class="font-mono"></b> and checking each PHP host against the PHP2Shell ranges. Your report will appear in your <b>Reports Hub</b>, and we'll email the link to <b id="doneEmail"></b>.</p>
+            <p id="doneRef" class="mt-4 rounded-lg bg-mist-50 px-3 py-2 font-mono text-sm text-mist-500 ring-1 ring-mist-200"></p>
+            <div class="mt-6 rounded-2xl bg-navy-950 p-5 text-white">
+              <p class="display text-lg font-semibold">One scan shows today. Your attack surface keeps changing.</p>
+              <p class="mt-1 text-[15px] text-mist-200">Re-scan every quarter to catch new systems and regressions. Just $25 every quarter, <s class="text-mist-400">$100</s> $75/year.</p>
+              <a id="upgradeLink" href="#pricing" class="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 font-semibold text-navy-950 hover:bg-care-50">Upgrade to annual · $75/yr</a>
+            </div>
+
+            <!-- Sample report preview (fills the space beside the long left column; fictional data) -->
+            <div id="reportPreview" class="mt-6 rounded-2xl bg-mist-25 p-5 ring-1 ring-mist-200" aria-label="Sample report preview">
+              <div class="flex items-center justify-between gap-3"><p class="text-[12px] font-semibold uppercase tracking-[.1em] text-care-700">What your report shows</p><span class="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-mist-500 ring-1 ring-mist-200">Sample</span></div>
+              <p class="display mt-1 text-lg font-semibold text-navy-950">Your Reports Hub, at a glance</p>
+              <div class="mt-4 rounded-xl bg-risk-50 p-3 ring-1 ring-risk-100">
+                <p class="flex items-center gap-2 text-[13px] font-semibold text-risk-600"><span class="h-2 w-2 rounded-full bg-risk-500"></span>PHP2Shell exposed on 3 of 24 systems</p>
+                <div class="mt-1.5"><div class="grid grid-cols-[1fr_auto] items-center gap-x-3 border-t border-risk-100 py-1.5 text-[12.5px]"><span class="min-w-0"><span class="truncate font-mono text-navy-950 block">shop.northwind.example</span><span class="font-mono text-mist-500">PHP 8.3.12</span></span><span class="text-right font-semibold text-care-700">Install 8.3.36</span></div><div class="grid grid-cols-[1fr_auto] items-center gap-x-3 border-t border-risk-100 py-1.5 text-[12.5px]"><span class="min-w-0"><span class="truncate font-mono text-navy-950 block">legacy.northwind.example</span><span class="font-mono text-mist-500">PHP 7.4.33</span></span><span class="text-right font-semibold text-risk-600">Upgrade to 8.4 · no fix</span></div><div class="grid grid-cols-[1fr_auto] items-center gap-x-3 border-t border-risk-100 py-1.5 text-[12.5px]"><span class="min-w-0"><span class="truncate font-mono text-navy-950 block">portal.northwind.example</span><span class="font-mono text-mist-500">PHP hidden</span></span><span class="text-right font-semibold text-care-700">Check on server</span></div></div>
+              </div>
+              <p class="mt-4 flex items-baseline justify-between text-[12px] font-semibold text-navy-800"><span>24 internet-facing systems</span><span class="font-normal text-mist-500">by risk rating</span></p>
+              <div class="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-mist-100" role="img" aria-label="2 Critical, 5 High, 9 Medium, 8 Low"><span class="bg-risk-500" style="width:8.3%"></span><span class="bg-gold-500" style="width:20.8%"></span><span class="bg-care-300" style="width:37.5%"></span><span class="bg-care-600" style="width:33.3%"></span></div>
+              <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-mist-500"><span class="inline-flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-full bg-risk-500"></i>2 Critical</span><span class="inline-flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-full bg-gold-500"></i>5 High</span><span class="inline-flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-full bg-care-300"></i>9 Medium</span><span class="inline-flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-full bg-care-600"></i>8 Low</span></div>
+              <div class="mt-4 grid grid-cols-3 gap-2"><div class="rounded-xl bg-white p-2.5 ring-1 ring-mist-200"><span class="mb-1 inline-block rounded-full px-2 text-[10px] font-semibold bg-risk-50 text-risk-600">Critical</span><p class="text-[12px] font-semibold leading-snug text-navy-950">Database port open</p><p class="mt-0.5 text-[11px] leading-snug text-mist-500">MySQL 3306 reachable on 1 host</p></div><div class="rounded-xl bg-white p-2.5 ring-1 ring-mist-200"><span class="mb-1 inline-block rounded-full px-2 text-[10px] font-semibold bg-risk-50 text-risk-600">High</span><p class="text-[12px] font-semibold leading-snug text-navy-950">Email can be spoofed</p><p class="mt-0.5 text-[11px] leading-snug text-mist-500">DMARC set to p=none</p></div><div class="rounded-xl bg-white p-2.5 ring-1 ring-mist-200"><span class="mb-1 inline-block rounded-full px-2 text-[10px] font-semibold bg-gold-50 text-gold-700">Medium</span><p class="text-[12px] font-semibold leading-snug text-navy-950">Old TLS 1.0</p><p class="mt-0.5 text-[11px] leading-snug text-mist-500">Accepted on 4 systems</p></div></div>
+              <p class="mt-3 text-[12px] text-mist-500">Plus a ranked fix plan and PDF reports your IT partner can act on.</p>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Facts -->
+  <section class="border-y border-mist-200 bg-white">
+    <div class="gutter mx-auto grid max-w-6xl grid-cols-2 md:grid-cols-4">
+      <div class="py-6 pr-4 md:border-r md:border-mist-200"><p class="display text-3xl font-semibold tabular-nums text-navy-950">9.2</p><p class="text-sm text-mist-500">CVSS v4.0, both CVEs</p></div>
+      <div class="border-l border-mist-200 py-6 pl-4 md:border-l-0 md:border-r md:px-6"><p class="display text-3xl font-semibold text-navy-950">5.4 → 8.5</p><p class="text-sm text-mist-500">PHP versions affected</p></div>
+      <div class="border-t border-mist-200 py-6 pr-4 md:border-r md:border-t-0 md:px-6"><p class="display text-3xl font-semibold text-navy-950">Oct 17</p><p class="text-sm text-mist-500">First attacks, before the patch</p></div>
+      <div class="border-l border-t border-mist-200 py-6 pl-4 md:border-l-0 md:border-t-0 md:px-6"><p class="display text-3xl font-semibold text-navy-950">~70%</p><p class="text-sm text-mist-500">of websites run PHP</p></div>
+    </div>
+  </section>
+
+  <!-- ============ SYSTEMS AT RISK ============ -->
+  <section id="systems" class="scroll-mt-6">
+    <div class="gutter mx-auto max-w-6xl py-20">
+      <div class="grid items-end gap-6 lg:grid-cols-[1fr_1fr]">
+        <div class="min-w-0">
+          <p class="text-[13px] font-semibold uppercase tracking-[.12em] text-care-700">Where PHP runs in healthcare</p>
+          <h2 class="display mt-2 text-4xl font-semibold text-navy-950">Your hospital website and patient portal are often the ones exposed</h2>
+        </div>
+        <p class="min-w-0 text-lg text-mist-500">Many healthcare organizations rely on PHP for their most public-facing systems. A single vulnerable instance can expose protected health information, disrupt care operations and create HIPAA compliance risk.</p>
+      </div>
+
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="rounded-2xl bg-white p-5 ring-1 ring-mist-200">
+          <svg class="h-8 w-8 text-care-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c.8-1.6 2.2-2.4 4-2.4s3.2.8 4 2.4"/></svg>
+          <h3 class="display mt-4 text-[17px] font-semibold text-navy-950">Patient portals</h3>
+          <p class="mt-1 text-[15px] text-mist-500">Records, results and messages behind one login page.</p>
+        </div>
+        <div class="rounded-2xl bg-white p-5 ring-1 ring-mist-200">
+          <svg class="h-8 w-8 text-care-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>
+          <h3 class="display mt-4 text-[17px] font-semibold text-navy-950">Appointment scheduling</h3>
+          <p class="mt-1 text-[15px] text-mist-500">Booking forms that hold names, dates and reasons for visit.</p>
+        </div>
+        <div class="rounded-2xl bg-white p-5 ring-1 ring-mist-200">
+          <svg class="h-8 w-8 text-care-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>
+          <h3 class="display mt-4 text-[17px] font-semibold text-navy-950">Telehealth interfaces</h3>
+          <p class="mt-1 text-[15px] text-mist-500">Visit pages and intake forms that sit in front of live consultations.</p>
+        </div>
+        <div class="rounded-2xl bg-white p-5 ring-1 ring-mist-200">
+          <svg class="h-8 w-8 text-care-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/><path d="M11 8v6M8 11h6"/></svg>
+          <h3 class="display mt-4 text-[17px] font-semibold text-navy-950">Provider directories</h3>
+          <p class="mt-1 text-[15px] text-mist-500">Search tools often built on older CMS stacks.</p>
+        </div>
+        <div class="rounded-2xl bg-white p-5 ring-1 ring-mist-200 sm:col-span-2 lg:col-span-1">
+          <svg class="h-8 w-8 text-care-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg>
+          <h3 class="display mt-4 text-[17px] font-semibold text-navy-950">Hospital websites</h3>
+          <p class="mt-1 text-[15px] text-mist-500">Main hospital sites, location pages and campaign microsites.</p>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-3">
+        <div class="flex gap-3 rounded-2xl bg-risk-50 p-5 ring-1 ring-risk-100"><span class="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-risk-500"></span><p class="text-[15px] text-navy-900"><b>Protected health information</b> can be exposed through one compromised server.</p></div>
+        <div class="flex gap-3 rounded-2xl bg-risk-50 p-5 ring-1 ring-risk-100"><span class="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-risk-500"></span><p class="text-[15px] text-navy-900"><b>Care operations</b> can be disrupted if scheduling or telehealth goes down.</p></div>
+        <div class="flex gap-3 rounded-2xl bg-risk-50 p-5 ring-1 ring-risk-100"><span class="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-risk-500"></span><p class="text-[15px] text-navy-900"><b>HIPAA compliance risk</b> follows any unpatched system that touches patient data.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section id="report" class="scroll-mt-6 border-t border-mist-200 bg-mist-50">
+    <div class="gutter mx-auto grid max-w-6xl items-start gap-12 py-20 lg:grid-cols-[.85fr_1.15fr]">
+      <div class="min-w-0">
+        <p class="text-[13px] font-semibold uppercase tracking-[.12em] text-care-700">External Attack Surface Analysis</p>
+        <h2 class="display mt-2 text-4xl font-semibold text-navy-950">What your report shows</h2>
+        <p class="mt-4 text-lg text-mist-500">SureShield checks your hospital website, your patient portal and every other internet-facing system for PHP versions affected by PHP2Shell, and tells you how to fix each one.</p>
+        <dl class="mt-8 grid gap-5">
+          <div class="grid grid-cols-[2.25rem_1fr] gap-3">
+            <dt class="flex h-9 w-9 items-center justify-center rounded-full bg-white font-display text-sm font-semibold text-care-700 ring-1 ring-mist-200">A</dt>
+            <dd><b class="text-navy-950">Asset discovery.</b> <span class="text-mist-500">Your hospital website, patient portal, scheduling and telehealth systems, plus every subdomain, IP, open port and certificate, including vendor-hosted sites.</span></dd>
+          </div>
+          <div class="grid grid-cols-[2.25rem_1fr] gap-3">
+            <dt class="flex h-9 w-9 items-center justify-center rounded-full bg-white font-display text-sm font-semibold text-care-700 ring-1 ring-mist-200">B</dt>
+            <dd><b class="text-navy-950">PHP2Shell status.</b> <span class="text-mist-500">PHP version and server type for the hospital website, the patient portal and every other host, matched against the vulnerable ranges.</span></dd>
+          </div>
+          <div class="grid grid-cols-[2.25rem_1fr] gap-3">
+            <dt class="flex h-9 w-9 items-center justify-center rounded-full bg-white font-display text-sm font-semibold text-care-700 ring-1 ring-mist-200">C</dt>
+            <dd><b class="text-navy-950">Other critical exposures.</b> <span class="text-mist-500">High-severity issues found on the same systems.</span></dd>
+          </div>
+          <div class="grid grid-cols-[2.25rem_1fr] gap-3">
+            <dt class="flex h-9 w-9 items-center justify-center rounded-full bg-white font-display text-sm font-semibold text-care-700 ring-1 ring-mist-200">D</dt>
+            <dd><b class="text-navy-950">Prioritized remediation.</b> <span class="text-mist-500">The exact fixed version, restart steps and guidance for end-of-life PHP, ranked by risk.</span></dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Report mock -->
+      <div class="min-w-0 overflow-hidden rounded-3xl bg-white shadow-[0_24px_60px_-30px_rgba(11,31,51,.35)] ring-1 ring-mist-200" role="img" aria-label="Sample report for Riverside Health: 38 assets, 2 systems vulnerable to PHP2Shell, the patient portal and the hospital website, risk score 68 of 100.">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-mist-100 px-5 py-3">
+          <span class="font-mono text-xs text-mist-500">Reports Hub › riversidehealth.org › Baseline</span>
+          <span class="rounded-md bg-gold-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-gold-700">SAMPLE DATA</span>
+        </div>
+        <div class="grid grid-cols-2 border-b border-mist-100 sm:grid-cols-4">
+          <div class="p-4"><p class="display text-3xl font-semibold tabular-nums text-navy-950">38</p><p class="text-xs text-mist-500">Assets found</p></div>
+          <div class="border-l border-mist-100 p-4"><p class="display text-3xl font-semibold tabular-nums text-navy-950">94</p><p class="text-xs text-mist-500">Open ports</p></div>
+          <div class="border-t border-mist-100 p-4 sm:border-l sm:border-t-0"><p class="display text-3xl font-semibold tabular-nums text-risk-500">2</p><p class="text-xs text-mist-500">PHP2Shell systems</p></div>
+          <div class="border-l border-t border-mist-100 p-4 sm:border-t-0"><p class="display text-3xl font-semibold tabular-nums text-gold-700">68<span class="text-base text-mist-400">/100</span></p><p class="text-xs text-mist-500">Risk score</p></div>
+        </div>
+        <div class="px-5 pb-5 pt-4">
+          <p class="mb-2 text-[12px] font-semibold uppercase tracking-widest text-mist-400">PHP2Shell status</p>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[460px] text-[14px]">
+              <thead><tr class="text-left text-[11px] uppercase tracking-wider text-mist-400"><th class="py-2 pr-4 font-semibold">System</th><th class="py-2 pr-4 font-semibold">PHP</th><th class="py-2 pr-4 font-semibold">Use</th><th class="py-2 font-semibold">Status</th></tr></thead>
+              <tbody class="divide-y divide-mist-100">
+                <tr><td class="py-2.5 pr-4 font-mono text-[13px] text-navy-900">portal.riversidehealth.org</td><td class="py-2.5 pr-4 font-mono text-[13px]">8.3.12</td><td class="py-2.5 pr-4 text-mist-500">Patient portal</td><td class="py-2.5"><span class="rounded-full bg-risk-50 px-2 py-0.5 text-[12px] font-semibold text-risk-600">Critical</span></td></tr>
+                <tr><td class="py-2.5 pr-4 font-mono text-[13px] text-navy-900">www.riversidehealth.org</td><td class="py-2.5 pr-4 font-mono text-[13px]">7.4.33</td><td class="py-2.5 pr-4 text-mist-500">Hospital website</td><td class="py-2.5"><span class="rounded-full bg-risk-50 px-2 py-0.5 text-[12px] font-semibold text-risk-600">Critical · EOL</span></td></tr>
+                <tr><td class="py-2.5 pr-4 font-mono text-[13px] text-navy-900">book.riversidehealth.org</td><td class="py-2.5 pr-4 font-mono text-[13px]">8.4.27</td><td class="py-2.5 pr-4 text-mist-500">Scheduling</td><td class="py-2.5"><span class="rounded-full bg-care-50 px-2 py-0.5 text-[12px] font-semibold text-care-700">Patched</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 rounded-xl bg-care-50 p-3 text-[14px] text-navy-900 ring-1 ring-care-100">
+            <b class="text-care-700">Next steps:</b> upgrade the patient portal to PHP 8.3.36, move the hospital website off end-of-life PHP 7.4, then restart and confirm the running versions.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section id="pricing" class="scroll-mt-6">
+    <div class="gutter mx-auto max-w-6xl py-20">
+      <div class="max-w-2xl">
+        <p class="text-[13px] font-semibold uppercase tracking-[.12em] text-care-700">Plans</p>
+        <h2 class="display mt-2 text-4xl font-semibold text-navy-950">Start with a free baseline. Stay covered all year.</h2>
+        <p class="mt-4 text-lg text-mist-500">A baseline shows where you stand today. Quarterly scans catch new systems, vendor changes and the next critical vulnerability.</p>
+      </div>
+
+      <div class="mt-10 grid gap-6 md:grid-cols-2">
+        <div class="flex min-w-0 flex-col rounded-3xl bg-white p-7 ring-1 ring-mist-200">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="display text-xl font-semibold text-navy-950">Baseline Scan</h3>
+            <span class="rounded-full bg-gold-50 px-2.5 py-0.5 text-[12px] font-semibold text-gold-700">Limited time</span>
+          </div>
+          <p class="mt-4"><span class="display text-5xl font-semibold text-navy-950">$0</span> <span class="text-mist-500">one-time</span></p>
+          <p class="mt-2 text-[15px] text-mist-500">Your current PHP2Shell and external exposure, right now.</p>
+          <ul class="mt-6 grid gap-3 text-[15px] text-navy-900">
+            <li class="flex gap-3"><span class="text-care-600">✓</span>1 external attack surface scan</li>
+            <li class="flex gap-3"><span class="text-care-600">✓</span>PHP2Shell status per system</li>
+            <li class="flex gap-3"><span class="text-care-600">✓</span>Prioritized remediation steps</li>
+            <li class="flex gap-3"><span class="text-care-600">✓</span>Report in your Reports Hub</li>
+            <li class="flex gap-3 text-mist-400"><span>—</span>Quarterly re-scans</li>
+            <li class="flex gap-3 text-mist-400"><span>—</span>Change tracking between scans</li>
+          </ul>
+          <a href="#scan" data-plan="free_baseline" class="mt-8 inline-flex items-center justify-center rounded-full px-5 py-3 font-semibold text-navy-950 ring-1 ring-mist-200 hover:bg-mist-50">Claim Free Baseline Scan</a>
+        </div>
+
+        <div class="relative flex min-w-0 flex-col rounded-3xl bg-navy-950 p-7 text-white">
+          <span class="absolute -top-3 left-7 rounded-full bg-care-500 px-3 py-0.5 text-[12px] font-semibold text-white">Recommended</span>
+          <h3 class="display text-xl font-semibold">Annual Monitoring</h3>
+          <div class="mt-4 flex flex-wrap items-end gap-x-5 gap-y-3">
+            <p class="flex items-baseline gap-x-3">
+              <s class="display text-3xl font-semibold text-mist-400 decoration-risk-500 decoration-[3px]" aria-label="was $100">$100</s>
+              <span class="display text-7xl font-bold tracking-tight text-care-300">$75</span>
+              <span class="text-mist-200">/ year</span>
+            </p>
+            <p class="mb-2 rounded-xl bg-white/10 px-3 py-1.5 ring-1 ring-white/20"><span class="display text-2xl font-bold">$25</span> <span class="font-semibold text-care-300">every quarter</span></p>
+          </div>
+          <p class="mt-2 text-[15px] text-mist-200">Quarterly attack surface scans, all year.</p>
+          <ul class="mt-6 grid gap-3 text-[15px]">
+            <li class="flex gap-3"><span class="text-care-300">✓</span><b class="font-semibold">4 quarterly</b>&nbsp;attack surface scans</li>
+            <li class="flex gap-3"><span class="text-care-300">✓</span>PHP2Shell and new critical CVE checks</li>
+            <li class="flex gap-3"><span class="text-care-300">✓</span>Prioritized remediation steps</li>
+            <li class="flex gap-3"><span class="text-care-300">✓</span>Every report in your Reports Hub</li>
+            <li class="flex gap-3"><span class="text-care-300">✓</span>Change tracking: new systems and regressions</li>
+            <li class="flex gap-3"><span class="text-care-300">✓</span>Documentation for compliance reviews</li>
+          </ul>
+          <a href="#scan" data-plan="annual" class="mt-8 inline-flex items-center justify-center rounded-full bg-care-500 px-5 py-3 font-semibold text-white hover:bg-care-600">Start free, then upgrade</a>
+          <p class="mt-3 text-center text-xs text-mist-400">Your free baseline counts as the first scan's starting point.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="bg-care-50">
+    <div class="gutter mx-auto max-w-6xl py-20 text-center">
+      <h2 class="display mx-auto max-w-2xl text-4xl font-semibold text-navy-950">Protect patient data before attackers reach it.</h2>
+      <p class="mx-auto mt-4 max-w-xl text-lg text-mist-500">Find out which of your internet-facing systems are exposed to PHP2Shell, and exactly how to fix them.</p>
+      <a href="#scan" class="display mt-8 inline-flex items-center gap-2 rounded-full bg-care-600 px-7 py-4 text-lg font-semibold text-white hover:bg-care-700">Claim Free Baseline Scan</a>
+      <p class="mt-4 text-sm text-mist-500">Agentless · Non-intrusive · Powered by SecurityShield-TVM</p>
+    </div>
+  </section>
+
+  <footer class="border-t border-mist-200 bg-white">
+    <div class="gutter mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 py-6 text-sm text-mist-500">
+      <span class="flex items-center gap-3"><img src="data:image/webp;base64,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" alt="SureShield" width="344" height="102" class="h-7 w-auto">&copy; 2026 SureShield · sure-shield.com</span>
+      <span><a href="#scan-terms" class="hover:text-navy-950" data-open-terms>Scan terms</a> · Ref: PHP advisory Oct 21, 2026 · CVE-2026-109618 · CVE-2026-109619</span>
+    </div>
+  </footer>
+</div>
+
+<!-- Scan terms modal -->
+<div id="termsModal" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="termsTitle" hidden>
+  <div class="max-h-full w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="termsTitle" class="display text-2xl font-semibold text-navy-950">Scan terms</h2>
+      <button type="button" id="termsClose" class="rounded-full px-2.5 py-1 text-mist-500 hover:bg-mist-50 hover:text-navy-950" aria-label="Close">✕</button>
+    </div>
+    <p class="mt-1 font-mono text-[11px] text-gold-700">Summary, draft pending legal review</p>
+    <ul class="mt-5 grid gap-3 text-[15px] text-navy-800">
+      <li><b>Scope.</b> We scan internet-facing assets associated with your organization's domain: domains, subdomains, IP addresses, open ports and certificates.</li>
+      <li><b>Method.</b> External and non-intrusive. We read information your systems already make public. We don't exploit vulnerabilities, attempt logins, access internal networks or access patient data.</li>
+      <li><b>Authorization.</b> You confirm you're authorized to approve this scan for your organization. We record your consent, its time and its wording.</li>
+      <li><b>Results.</b> Reports are delivered only to your Reports Hub and your business email.</li>
+      <li><b>Contact.</b> We may follow up about your findings and the annual plan. You can opt out at any time.</li>
+    </ul>
+    <a id="termsFull" href="#" target="_blank" rel="noopener" class="mt-6 inline-block text-sm font-semibold text-care-700 underline underline-offset-4">Read the full scan terms</a>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script>
+/* ================= CONFIG ================= */
+const API_ENDPOINT        = window.__SCAN_ENDPOINT || "";   // Apps Script web app URL (…/exec), from config.js or set by the web app. Empty = preview mode, nothing is sent.
+const SCAN_TERMS_URL      = "";   // e.g. "https://sure-shield.com/scan-terms"
+const ANNUAL_CHECKOUT_URL = window.__CHECKOUT_URL || "";   // Stripe Payment Link for the $75/yr plan, from config.js or set by the web app. Empty = the buttons scroll to pricing.
+const CAMPAIGN            = "php2shell-2026-10";
+const CONSENT_VERSION     = "2026-10-26";
+
+const FREE_DOMAINS = ["gmail.com","googlemail.com","yahoo.com","yahoo.co.in","outlook.com","hotmail.com","live.com","msn.com","icloud.com","me.com","aol.com","proton.me","protonmail.com","gmx.com","mail.com","yandex.com","zoho.com","rediffmail.com"];
+const $ = id => document.getElementById(id);
+
+/* Terms modal */
+const modal = $("termsModal"); let lastFocus = null;
+function openTerms(e){ if (e) e.preventDefault(); lastFocus = document.activeElement; modal.hidden = false; $("termsClose").focus(); }
+function closeTerms(){ modal.hidden = true; if (lastFocus) lastFocus.focus(); }
+$("termsLink").addEventListener("click", openTerms);
+document.querySelectorAll("[data-open-terms]").forEach(a => a.addEventListener("click", openTerms));
+$("termsClose").addEventListener("click", closeTerms);
+modal.addEventListener("click", e => { if (e.target === modal) closeTerms(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) closeTerms(); });
+if (SCAN_TERMS_URL) $("termsFull").href = SCAN_TERMS_URL; else $("termsFull").hidden = true;
+
+/* Plan interest */
+/* Stripe Payment Link with the visitor's email prefilled and their domain as the reference */
+function checkoutUrl(email, domain){
+  if (!ANNUAL_CHECKOUT_URL) return "";
+  try { const u = new URL(ANNUAL_CHECKOUT_URL);
+    if (email) u.searchParams.set("prefilled_email", email);
+    if (domain) u.searchParams.set("client_reference_id", domain.replace(/[^A-Za-z0-9_-]/g, "_"));
+    return u.toString(); } catch (e) { return ""; }
+}
+const submitLabel = () => (ANNUAL_CHECKOUT_URL && $("plan").value === "annual") ? "Start free scan, then pay $75/yr" : "Claim Free Baseline Scan";
+document.querySelectorAll("[data-plan]").forEach(a => a.addEventListener("click", () => { $("plan").value = a.dataset.plan; $("btnLabel").textContent = submitLabel(); }));
+
+/* Live scan target */
+const emailDomain = v => (v.trim().toLowerCase().split("@")[1] || "");
+$("email").addEventListener("input", () => {
+  const d = emailDomain($("email").value);
+  $("targetDomain").textContent = /\.[a-z]{2,}$/.test(d) ? d : "your email's domain";
+});
+
+/* Validation */
+function mark(id, bad){ bad ? $(id).setAttribute("aria-invalid","true") : $(id).removeAttribute("aria-invalid"); }
+function validate(){
+  let ok = true;
+  for (const id of ["org","fname","lname"]) { const bad = !$(id).value.trim(); mark(id, bad); if (bad) ok = false; }
+  const email = $("email").value.trim().toLowerCase(), d = emailDomain(email);
+  let msg = "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) msg = "Enter a valid business email.";
+  else if (FREE_DOMAINS.includes(d)) msg = "Use your work email. We scan your organization's domain, so personal addresses can't be used.";
+  $("emailErr").textContent = msg; mark("email", !!msg); if (msg) ok = false;
+  $("consentErr").textContent = $("consent").checked ? "" : "Please confirm authorization to run the scan.";
+  if (!$("consent").checked) ok = false;
+  return ok;
+}
+
+/* Payload */
+function buildPayload(){
+  const email = $("email").value.trim().toLowerCase();
+  return {
+    campaign: CAMPAIGN,
+    source: "php2shell_landing",
+    organization: $("org").value.trim(),
+    first_name: $("fname").value.trim(),
+    last_name: $("lname").value.trim(),
+    email,
+    scan_domain: emailDomain(email),
+    plan_interest: $("plan").value,
+    audience: $("audience").value,                  // healthcare
+    consent: {
+      granted: $("consent").checked,
+      text: $("consentText").textContent.trim(),
+      version: CONSENT_VERSION,
+      terms_url: SCAN_TERMS_URL || null,
+      client_timestamp: new Date().toISOString()
+    },
+    page_url: (window.__PAGE && window.__PAGE.url) || location.href.split("#")[0],
+    utm: (window.__PAGE && window.__PAGE.params) || Object.fromEntries(new URLSearchParams(location.search).entries()),
+    hp: $("website").value
+  };
+}
+
+/* Submit */
+$("lead").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!validate()) { const bad = document.querySelector('[aria-invalid="true"]') || $("consent"); bad.focus(); return; }
+  const payload = buildPayload();
+  const btn = $("submitBtn");
+  btn.disabled = true; $("btnLabel").textContent = "Starting your scan…";
+  $("btnIcon").outerHTML = '<svg id="btnIcon" class="spin h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>';
+  try {
+    let ref = "PREVIEW-" + Date.now().toString(36).toUpperCase();
+    if (API_ENDPOINT) {
+      const r = await fetch(API_ENDPOINT, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error(data.error || ("HTTP " + r.status));
+      ref = data.scan_id || ref;
+    }
+    $("doneDomain").textContent = payload.scan_domain;
+    $("doneEmail").textContent = payload.email;
+    $("doneRef").textContent = "Scan ID: " + ref;
+    const pay = checkoutUrl(payload.email, payload.scan_domain);
+    if (pay) $("upgradeLink").href = pay;                  /* Stripe checkout, same tab */
+    $("formBody").hidden = true; $("formDone").hidden = false;
+    if (pay && payload.plan_interest === "annual") {        /* "Start free, then upgrade": scan registered, now take them to payment */
+      $("upgradeLink").textContent = "Taking you to payment…";
+      setTimeout(() => { location.href = pay; }, 2200);
+    }
+  } catch (err) {
+    $("consentErr").textContent = String(err.message).includes("domain") ? err.message : "We couldn't start your scan just now. Try again in a minute.";
+    btn.disabled = false; $("btnLabel").textContent = submitLabel();
+  }
+});
+</script>
+
+</body></html>
